@@ -1,0 +1,8 @@
+C:\Users\oisht\OneDrive\Documents\Offspace Ai\offspace\src-tauri\target\debug\deps\walkdir-ae51cbd751584465.d: C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\lib.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\dent.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\error.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\util.rs
+
+C:\Users\oisht\OneDrive\Documents\Offspace Ai\offspace\src-tauri\target\debug\deps\libwalkdir-ae51cbd751584465.rmeta: C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\lib.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\dent.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\error.rs C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\util.rs
+
+C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\lib.rs:
+C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\dent.rs:
+C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\error.rs:
+C:\Users\oisht\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\walkdir-2.5.0\src\util.rs:
