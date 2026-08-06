@@ -27,11 +27,35 @@ Build a production-quality personal AI assistant that:
 git clone https://github.com/byiringirojd12-afk/offspace.git
 cd offspace
 python -m venv venv
-source venv/bin/activate
+# Activate the virtual environment:
+# Windows: .venv\Scripts\Activate.ps1
+# macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+# Edit .env and set OFFSPACE_SECRET_KEY or JWT_SECRET_KEY to a strong secret
 python main.py
 ```
+
+## 🔧 Backend Setup
+
+1. Copy `.env.example` to `.env`.
+2. Set `OFFSPACE_SECRET_KEY` or `JWT_SECRET_KEY` to a strong secret.
+3. Set `DATABASE_URL` for your local or production database.
+4. Run backend tests with:
+
+```bash
+.venv\Scripts\python.exe -m pytest backend/tests -q
+```
+
+## 📦 API Startup
+
+Start the backend with:
+
+```bash
+.venv\Scripts\python.exe backend/main.py
+```
+
+Then visit `http://localhost:8000/api/v1/health`.
 
 ## 🎓 Development Phases
 

@@ -1,9 +1,34 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
 type ChatMessage = {
   role: 'assistant' | 'user';
   text: string;
 };
 
-const sampleMessages: ChatMessage[] = [
+type SpeechRecognitionCtor = new () => SpeechRecognition;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  }
+
+  interface SpeechRecognition extends EventTarget {
+    lang: string;
+    interimResults: boolean;
+    continuous: boolean;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onend: (() => void) | null;
+    start: () => void;
+    stop: () => void;
+  }
+
+  interface SpeechRecognitionEvent {
+    results: SpeechRecognitionResultList;
+  }
+}
+
+const initialMessages: ChatMessage[] = [
   {
     role: 'assistant',
     text: 'System online. I can help you manage priorities, automate tasks, and keep your context in sync.',
@@ -15,6 +40,100 @@ const sampleMessages: ChatMessage[] = [
 ];
 
 function App() {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [command, setCommand] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState('Voice ready');
+  const [isListening, setIsListening] = useState(false);
+  const [wakeDetected, setWakeDetected] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  const speechRecognitionSupport = useMemo(() => {
+    return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }, []);
+
+  useEffect(() => {
+    if (!speechRecognitionSupport) {
+      setVoiceStatus('Microphone support unavailable in this browser');
+    }
+  }, [speechRecognitionSupport]);
+
+  const speak = (text: string) => {
+    if (!('speechSynthesis' in window)) {
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startVoiceCapture = () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setVoiceStatus('Speech recognition unsupported by this browser');
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? '')
+        .join(' ')
+        .trim();
+
+      setCommand(transcript);
+      const lowerTranscript = transcript.toLowerCase();
+
+      if (lowerTranscript.includes('hey offspace')) {
+        setWakeDetected(true);
+        setVoiceStatus('Wake phrase detected. Listening for command.');
+        speak('Hey Offspace. I am ready.');
+      } else {
+        setVoiceStatus(`Captured: ${transcript}`);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (!wakeDetected) {
+        setVoiceStatus('Voice capture stopped');
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+    setVoiceStatus('Listening for “Hey Offspace”');
+  };
+
+  const stopVoiceCapture = () => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+    setVoiceStatus('Voice channel muted');
+  };
+
+  const submitCommand = () => {
+    const trimmed = command.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setMessages((current) => [
+      ...current,
+      { role: 'user', text: trimmed },
+      {
+        role: 'assistant',
+        text: `Command received: ${trimmed}. Safe automation will require confirmation for destructive actions.`,
+      },
+    ]);
+    setCommand('');
+    speak('Command received');
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar-panel">
@@ -39,8 +158,8 @@ function App() {
             <span className="status-pill">Synced</span>
           </div>
           <div className="settings-list">
-            <div>Wake phrase <strong>"Hey Offspace"</strong></div>
-            <div>Voice input <strong>Enabled</strong></div>
+            <div>Wake phrase <strong>“Hey Offspace”</strong></div>
+            <div>Voice input <strong>{speechRecognitionSupport ? 'Enabled' : 'Unavailable'}</strong></div>
             <div>Memory mode <strong>Local-first</strong></div>
           </div>
         </div>
@@ -53,7 +172,9 @@ function App() {
             <h2>Autonomous command engine</h2>
           </div>
           <div className="topbar-actions">
-            <button className="ghost-button">Voice</button>
+            <button className="ghost-button" onClick={isListening ? stopVoiceCapture : startVoiceCapture}>
+              {isListening ? 'Mute Mic' : 'Voice'}
+            </button>
             <button className="primary-button">Start Session</button>
           </div>
         </header>
@@ -70,6 +191,7 @@ function App() {
                 Context layering, workflow orchestration, and personalized memory routing are all streaming through
                 the shielded neural surface.
               </p>
+              <div className="voice-status">{voiceStatus}</div>
             </div>
           </div>
 
@@ -79,15 +201,19 @@ function App() {
               <span className="status-pill">Connected</span>
             </div>
             <div className="messages">
-              {sampleMessages.map((message, index) => (
+              {messages.map((message, index) => (
                 <div key={index} className={`message ${message.role}`}>
                   {message.text}
                 </div>
               ))}
             </div>
             <div className="composer">
-              <input placeholder="Ask Offspace to plan, recall, or automate..." />
-              <button className="primary-button">Send</button>
+              <input
+                value={command}
+                onChange={(event) => setCommand(event.target.value)}
+                placeholder="Ask Offspace to plan, recall, or automate..."
+              />
+              <button className="primary-button" onClick={submitCommand}>Send</button>
             </div>
           </div>
         </section>
@@ -108,9 +234,11 @@ function App() {
           <div className="panel-card voice-card">
             <div className="panel-title-row">
               <span>Voice Button</span>
-              <span className="status-pill">Ready</span>
+              <span className="status-pill">{wakeDetected ? 'Wake phrase detected' : 'Ready'}</span>
             </div>
-            <button className="voice-button">Mic</button>
+            <button className="voice-button" onClick={isListening ? stopVoiceCapture : startVoiceCapture}>
+              {isListening ? 'Stop' : 'Mic'}
+            </button>
             <p>Tap to activate the wake channel or voice command stream.</p>
           </div>
         </section>
