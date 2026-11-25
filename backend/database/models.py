@@ -28,6 +28,19 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
+class UserSetting(Base):
+    __tablename__ = "user_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    preferred_provider: Mapped[str] = mapped_column(String(50), default="openai", nullable=False)
+    voice_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="settings")
+
+
 class MemoryEntry(Base):
     __tablename__ = "memory_entries"
 
@@ -105,3 +118,4 @@ User.conversations = relationship("ConversationEntry", back_populates="user", ca
 User.agent_tasks = relationship("AgentTask", back_populates="user", cascade="all, delete-orphan")
 User.logs = relationship("LogEntry", back_populates="user", cascade="all, delete-orphan")
 User.knowledge_documents = relationship("KnowledgeDocument", back_populates="user", cascade="all, delete-orphan")
+User.settings = relationship("UserSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")

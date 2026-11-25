@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.offspace.desktop",
   "build": {
+    "beforeBuildCommand": "npm run build && npm run build:backend",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },
@@ -23,7 +24,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "resources": {
+      "binaries/offspace-backend.exe": "offspace-backend.exe"
+    },
     "icon": []
   }
 }

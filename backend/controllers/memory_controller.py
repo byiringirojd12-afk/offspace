@@ -14,7 +14,7 @@ def save_memory(item: MemoryCreateSchema, db: Session = Depends(get_db), current
 
 @router.get("/search", response_model=MemorySearchResponse)
 def search_memory(query: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MemorySearchResponse:
-    return MemoryService(db).search_memory(current_user.id, query)
+    return MemorySearchResponse(results=MemoryService(db).search_memory(current_user.id, query))
 
 @router.delete("/{memory_id}")
 def delete_memory(memory_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> dict:

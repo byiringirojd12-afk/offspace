@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+from starlette.status import HTTP_422_UNPROCESSABLE_CONTENT
 
 from backend.api.errors import APIError, AuthenticationError
 from backend.config.settings import settings
@@ -34,8 +34,8 @@ def setup_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         logger.warning(f"Validation error for request {request.url}: {exc}")
         return JSONResponse(
-            status_code=HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"success": False, "error": "Validation failed", "details": exc.errors(), "status_code": HTTP_422_UNPROCESSABLE_ENTITY},
+            status_code=HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"success": False, "error": "Validation failed", "details": exc.errors(), "status_code": HTTP_422_UNPROCESSABLE_CONTENT},
         )
 
     @app.exception_handler(AuthenticationError)
