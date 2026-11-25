@@ -10,5 +10,7 @@ router = APIRouter()
 
 @router.post("/message", response_model=ChatResponseSchema)
 def send_message(request: ChatRequestSchema, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> ChatResponseSchema:
-    response_text = ChatService(db).send_message(current_user.id, request)
-    return ChatResponseSchema(response=response_text, provider=request.provider or "default")
+    service = ChatService(db)
+    provider = service.resolve_provider(current_user.id, request.provider)
+    response_text = service.send_message(current_user.id, request, provider)
+    return ChatResponseSchema(response=response_text, provider=provider)

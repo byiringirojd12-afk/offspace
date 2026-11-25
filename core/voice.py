@@ -40,8 +40,17 @@ class VoiceController:
                 self.recognizer.adjust_for_ambient_noise(source, duration=0.2)
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                 return self.recognizer.recognize_google(audio)
-        except (sr.UnknownValueError, sr.RequestError, OSError):
-            logger.warning("Unable to capture speech input")
+        except sr.UnknownValueError:
+            logger.warning("Speech recognition could not understand captured speech")
+            return ""
+        except sr.RequestError as exc:
+            logger.warning("Speech recognition service request failed (%s)", type(exc).__name__)
+            return ""
+        except sr.WaitTimeoutError:
+            logger.info("No speech was captured before the microphone timeout")
+            return ""
+        except OSError as exc:
+            logger.warning("Microphone could not be opened (%s)", type(exc).__name__)
             return ""
 
     def speak(self, text: str) -> str:

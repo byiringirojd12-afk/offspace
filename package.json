@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:backend": "node scripts/build_backend.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

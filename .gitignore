@@ -31,6 +31,7 @@ vite.config.d.ts
 
 # Tauri
 src-tauri/target/
+src-tauri/binaries/offspace-backend.exe
 
 # Logs
 logs/

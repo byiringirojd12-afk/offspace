@@ -6,6 +6,7 @@ from backend.api.router import api_router
 from backend.api.middleware import setup_middlewares, setup_exception_handlers, RequestLoggingMiddleware
 from backend.config.settings import settings
 from backend.database import engine
+from backend.database.models import Base
 from backend.logs.logger import logger
 from sqlalchemy import text
 
@@ -14,6 +15,7 @@ from sqlalchemy import text
 async def lifespan(app: FastAPI):
     logger.info("Starting Offspace backend")
     try:
+        Base.metadata.create_all(bind=engine)
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except Exception as exc:
@@ -45,4 +47,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=settings.debug)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=False)

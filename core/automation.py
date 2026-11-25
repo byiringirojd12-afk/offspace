@@ -14,6 +14,10 @@ class AutomationManager:
 
     DANGEROUS_ACTIONS = {"delete", "overwrite", "shutdown", "format"}
     APPLICATION_ACTIONS = {"open application", "open app", "launch"}
+    SHELL_ALLOWLIST = {
+        "python": "--version",
+        "where": None,
+    }
 
     def __init__(self, base_path: str = ".") -> None:
         self.base_path = Path(base_path).resolve()
@@ -59,6 +63,11 @@ class AutomationManager:
             target = self._parse_target(normalized) or "untitled.txt"
             content = self._get_content(normalized) or ""
             file_path = self.base_path / target
+            file_path = file_path.resolve()
+            if file_path != self.base_path and self.base_path not in file_path.parents:
+                return "File operation denied: target is outside the permitted workspace."
+            if file_path == self.base_path:
+                return "File operation denied: target must be a file inside the workspace."
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content, encoding="utf-8")
             return f"Created file: {file_path}"
@@ -82,7 +91,9 @@ class AutomationManager:
 
             target = self._parse_target(normalized)
             if target:
-                file_path = self.base_path / target
+                file_path = (self.base_path / target).resolve()
+                if file_path != self.base_path and self.base_path not in file_path.parents:
+                    return "Dangerous action denied: target is outside the permitted workspace."
                 if file_path.exists():
                     file_path.unlink()
                     return f"Deleted file: {file_path}"
@@ -93,9 +104,15 @@ class AutomationManager:
             if not self.permission_manager.has_permission("shell"):
                 return "Shell execution permission is denied."
             try:
-                command_text = command.split("execute", 1)[-1].strip() if "execute" in normalized else command
+                command_text = command.split("execute", 1)[-1].strip() if "execute" in normalized else normalized.replace("run shell", "", 1).strip()
+                parts = shlex.split(command_text)
+                if not parts:
+                    return "Shell execution failed: no command supplied."
+                executable = Path(parts[0]).name.lower()
+                if executable not in self.SHELL_ALLOWLIST:
+                    return f"Shell execution denied: '{executable}' is not allowlisted."
                 result = subprocess.run(
-                    shlex.split(command_text),
+                    parts,
                     capture_output=True,
                     text=True,
                     check=False,

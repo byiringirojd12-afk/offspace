@@ -1,7 +1,7 @@
 import os
 import secrets
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,8 +21,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256")
     token_expiration_seconds: int = Field(3600)
     refresh_token_expiration_seconds: int = Field(86400)
-    allowed_origins: list[str] = Field(["http://localhost", "http://localhost:3000"])
-    openai_api_key: str | None = Field(None)
+    allowed_origins: list[str] = Field([
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "tauri://localhost",
+        "http://tauri.localhost",
+    ])
+    openai_api_key: str | None = Field(
+        None,
+        validation_alias=AliasChoices("OFFSPACE_OPENAI_API_KEY", "OPENAI_API_KEY"),
+    )
+    default_provider: str = Field("openai")
+    local_ai_url: str = Field("http://127.0.0.1:11434")
+    local_ai_model: str = Field("llama3.2")
 
     @field_validator("secret_key", mode="before")
     @classmethod

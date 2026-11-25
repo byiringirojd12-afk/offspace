@@ -18,6 +18,7 @@ declare global {
     interimResults: boolean;
     continuous: boolean;
     onresult: ((event: SpeechRecognitionEvent) => void) | null;
+      onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
     onend: (() => void) | null;
     start: () => void;
     stop: () => void;
@@ -26,17 +27,14 @@ declare global {
   interface SpeechRecognitionEvent {
     results: SpeechRecognitionResultList;
   }
+
+  interface SpeechRecognitionErrorEvent {
+    error: string;
+  }
 }
 
 const initialMessages: ChatMessage[] = [
-  {
-    role: 'assistant',
-    text: 'System online. I can help you manage priorities, automate tasks, and keep your context in sync.',
-  },
-  {
-    role: 'user',
-    text: 'Summarize the key action items for the next work session.',
-  },
+  { role: 'assistant', text: 'System ready. Sign in to connect to OFFSPACE.' },
 ];
 
 function App() {
@@ -45,6 +43,12 @@ function App() {
   const [voiceStatus, setVoiceStatus] = useState('Voice ready');
   const [isListening, setIsListening] = useState(false);
   const [wakeDetected, setWakeDetected] = useState(false);
+  const [authToken, setAuthToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [backendReady, setBackendReady] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const speechRecognitionSupport = useMemo(() => {
@@ -57,12 +61,48 @@ function App() {
     }
   }, [speechRecognitionSupport]);
 
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+
+    const waitForBackend = async () => {
+      while (!cancelled && attempts < 40) {
+        attempts += 1;
+        try {
+          const response = await fetch('http://127.0.0.1:8000/api/v1/health', { cache: 'no-store' });
+          if (response.ok) {
+            if (!cancelled) {
+              setBackendReady(true);
+              setError('');
+              setMessages([{ role: 'assistant', text: 'Backend connected. System ready.' }]);
+            }
+            return;
+          }
+        } catch {
+          // Retry until the Tauri lifecycle reports a readiness timeout.
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+      if (!cancelled) {
+        setBackendReady(false);
+        setError('OFFSPACE backend did not become ready. Restart the application or check %LOCALAPPDATA%\\Offspace\\backend.log.');
+      }
+    };
+
+    void waitForBackend();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const speak = (text: string) => {
     if (!('speechSynthesis' in window)) {
+      setVoiceStatus('Text-to-speech is unavailable in this browser');
       return;
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onerror = () => setVoiceStatus('Text-to-speech failed');
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   };
@@ -85,6 +125,11 @@ function App() {
         .join(' ')
         .trim();
 
+      if (!transcript) {
+        setVoiceStatus('No speech was recognized');
+        return;
+      }
+
       setCommand(transcript);
       const lowerTranscript = transcript.toLowerCase();
 
@@ -95,6 +140,19 @@ function App() {
       } else {
         setVoiceStatus(`Captured: ${transcript}`);
       }
+    };
+
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+        ? 'Microphone permission was denied'
+        : event.error === 'audio-capture'
+          ? 'No microphone is available'
+          : event.error === 'no-speech'
+            ? 'No speech was detected'
+            : 'Speech recognition failed; check the browser speech service';
+      setVoiceStatus(message);
+      setError(message);
     };
 
     recognition.onend = () => {
@@ -116,22 +174,72 @@ function App() {
     setVoiceStatus('Voice channel muted');
   };
 
-  const submitCommand = () => {
+  const apiRequest = async (path: string, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    headers.set('Content-Type', 'application/json');
+    if (authToken) {
+      headers.set('Authorization', `Bearer ${authToken}`);
+    }
+    const response = await fetch(`http://127.0.0.1:8000${path}`, { ...init, headers });
+    const body = await response.json().catch(() => ({ error: 'The server returned an invalid response.' }));
+    if (!response.ok) {
+      throw new Error(body.error || body.detail || 'OFFSPACE request failed.');
+    }
+    return body;
+  };
+
+  const signIn = async () => {
+    if (!backendReady) {
+      setError('OFFSPACE backend is not ready yet.');
+      return;
+    }
+    if (!email.trim() || !password) {
+      setError('Email and password are required.');
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const body = await apiRequest('/api/v1/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      setAuthToken(body.access_token);
+      setMessages([{ role: 'assistant', text: 'Connected to OFFSPACE.' }]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Sign-in failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitCommand = async () => {
     const trimmed = command.trim();
     if (!trimmed) {
       return;
     }
-
-    setMessages((current) => [
-      ...current,
-      { role: 'user', text: trimmed },
-      {
-        role: 'assistant',
-        text: `Command received: ${trimmed}. Safe automation will require confirmation for destructive actions.`,
-      },
-    ]);
+    if (!authToken) {
+      setError('Sign in before sending a command.');
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    setMessages((current) => [...current, { role: 'user', text: trimmed }]);
     setCommand('');
-    speak('Command received');
+    try {
+      const body = await apiRequest('/api/v1/chat/message', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      setMessages((current) => [...current, { role: 'assistant', text: body.response }]);
+      speak(body.response);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'OFFSPACE could not process the command.';
+      setError(message);
+      setMessages((current) => [...current, { role: 'assistant', text: message }]);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -198,7 +306,7 @@ function App() {
           <div className="chat-card">
             <div className="panel-title-row">
               <span>Chat System</span>
-              <span className="status-pill">Connected</span>
+              <span className="status-pill">{backendReady ? 'Connected' : 'Offline'}</span>
             </div>
             <div className="messages">
               {messages.map((message, index) => (
@@ -207,13 +315,38 @@ function App() {
                 </div>
               ))}
             </div>
+            {error && <div className="voice-status" role="alert">{error}</div>}
             <div className="composer">
-              <input
-                value={command}
-                onChange={(event) => setCommand(event.target.value)}
-                placeholder="Ask Offspace to plan, recall, or automate..."
-              />
-              <button className="primary-button" onClick={submitCommand}>Send</button>
+              {!authToken ? (
+                <>
+                  <input
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="Email"
+                    type="email"
+                  />
+                  <input
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Password"
+                    type="password"
+                  />
+                  <button className="primary-button" onClick={signIn} disabled={isSubmitting}>
+                    {isSubmitting ? 'Signing in...' : 'Sign in'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    value={command}
+                    onChange={(event) => setCommand(event.target.value)}
+                    placeholder="Ask Offspace to plan, recall, or automate..."
+                  />
+                  <button className="primary-button" onClick={submitCommand} disabled={isSubmitting}>
+                    {isSubmitting ? 'Sending...' : 'Send'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </section>
