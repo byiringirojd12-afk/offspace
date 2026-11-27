@@ -1,5 +1,9 @@
-import uvicorn
+import sys
+import threading
 from contextlib import asynccontextmanager
+from typing import TextIO
+
+import uvicorn
 from fastapi import FastAPI
 
 from backend.api.router import api_router
@@ -46,5 +50,38 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+def _watch_parent_shutdown(
+    server: uvicorn.Server, control_stream: TextIO
+) -> None:
+    try:
+        for line in control_stream:
+            if line.strip() == "OFFSPACE_SHUTDOWN":
+                logger.info("Backend shutdown requested by desktop process")
+                server.should_exit = True
+                return
+    except (OSError, ValueError):
+        logger.exception("Backend control pipe failed; requesting shutdown")
+        server.should_exit = True
+        return
+
+    logger.info("Backend control pipe closed; requesting shutdown")
+    server.should_exit = True
+
+
+def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+    server = uvicorn.Server(
+        uvicorn.Config(app, host=host, port=port, reload=False)
+    )
+    control_stream = sys.stdin
+    if control_stream is not None and not control_stream.isatty():
+        threading.Thread(
+            target=_watch_parent_shutdown,
+            args=(server, control_stream),
+            daemon=True,
+            name="offspace-parent-control",
+        ).start()
+    server.run()
+
+
 if __name__ == "__main__":
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=False)
+    run_server()
