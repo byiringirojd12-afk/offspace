@@ -28,6 +28,6 @@
     "resources": {
       "binaries/offspace-backend.exe": "offspace-backend.exe"
     },
-    "icon": []
+    "icon": ["icons/icon.ico"]
   }
 }
